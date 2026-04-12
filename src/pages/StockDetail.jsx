@@ -22,11 +22,11 @@ function StatCard({ label, value, sub, icon: Icon, positive, negative, pct }) {
           <Icon size={15} className="text-accent" />
         </div>
       </div>
-      <div className="flex items-end gap-2">
-        <p className={`text-2xl font-semibold tracking-tight tabular-nums ${color}`}>{value}</p>
+      <div className="flex items-end gap-2 flex-wrap">
+        <p className={`text-xl sm:text-2xl font-semibold tracking-tight tabular-nums min-w-0 ${color}`}>{value}</p>
         {pct != null && (
           <span className={[
-            'mb-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold tabular-nums',
+            'mb-0.5 shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold tabular-nums',
             pct > 0 ? 'bg-positive-bg text-positive' : pct < 0 ? 'bg-negative-bg text-negative' : 'bg-bg-elevated text-text-secondary',
           ].join(' ')}>
             {pct > 0 ? '+' : ''}{pct.toFixed(2)}%

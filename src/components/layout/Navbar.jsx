@@ -11,7 +11,7 @@ const NAV_LINKS = [
   { label: 'Transactions',  path: '/transactions' },
 ]
 
-function TickerSearch() {
+function TickerSearch({ fullWidth = false }) {
   const navigate                        = useNavigate()
   const [query, setQuery]               = useState('')
   const [results, setResults]           = useState([])
@@ -95,9 +95,10 @@ function TickerSearch() {
   }
 
   return (
-    <div ref={containerRef} className="relative hidden md:block">
+    <div ref={containerRef} className={`relative ${fullWidth ? 'w-full' : 'hidden md:block'}`}>
       <div className={[
-        'flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors duration-150 w-56',
+        'flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors duration-150',
+        fullWidth ? 'w-full' : 'w-56',
         focused ? 'border-accent bg-bg-card' : 'border-border bg-bg-elevated',
       ].join(' ')}>
         <Search size={14} className="text-text-muted shrink-0" />
@@ -125,7 +126,7 @@ function TickerSearch() {
       {/* Dropdown */}
       {open && results.length > 0 && (
         <div
-          className="absolute top-full left-0 mt-1.5 w-72 rounded-xl border border-border py-1 z-50 overflow-hidden"
+          className={`absolute top-full left-0 mt-1.5 ${fullWidth ? 'w-full' : 'w-72'} rounded-xl border border-border py-1 z-50 overflow-hidden`}
           style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-md)' }}
         >
           {results.map((r, i) => (
@@ -291,22 +292,25 @@ export default function Navbar() {
         </div>
         </div>{/* end main row */}
 
-        {/* Mobile nav row — visible only on small screens */}
-        <nav className="flex sm:hidden items-center gap-1 pb-2">
-          {NAV_LINKS.map(({ label, path }) => {
-            const active = location.pathname === path
-            return (
-              <Link key={path} to={path}
-                className={[
-                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150',
-                  active ? 'bg-accent-subtle text-accent' : 'text-text-secondary hover:text-text hover:bg-bg-elevated',
-                ].join(' ')}
-              >
-                {label}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* Mobile second row — search + nav links, visible only on small screens */}
+        <div className="flex sm:hidden flex-col gap-1.5 pb-2">
+          <TickerSearch fullWidth />
+          <nav className="flex items-center gap-1">
+            {NAV_LINKS.map(({ label, path }) => {
+              const active = location.pathname === path
+              return (
+                <Link key={path} to={path}
+                  className={[
+                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150',
+                    active ? 'bg-accent-subtle text-accent' : 'text-text-secondary hover:text-text hover:bg-bg-elevated',
+                  ].join(' ')}
+                >
+                  {label}
+                </Link>
+              )
+            })}
+          </nav>
+        </div>
       </div>
     </header>
   )

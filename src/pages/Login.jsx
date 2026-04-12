@@ -64,7 +64,7 @@ export default function Login() {
       </div>
 
       {/* Center card */}
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
+      <div className="flex-1 flex items-start sm:items-center justify-center px-4 pt-6 pb-12 sm:py-12">
         <div className="w-full max-w-sm">
           {/* Heading */}
           <div className="mb-8 text-center">
