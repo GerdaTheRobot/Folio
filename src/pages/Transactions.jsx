@@ -8,7 +8,8 @@ import LotsTable from '../components/portfolio/LotsTable'
 import ImportModal from '../components/portfolio/ImportModal'
 import { useLots } from '../hooks/useLots'
 import { usePortfolio } from '../context/PortfolioContext'
-import { fmt, fmtDate } from '../lib/lots'
+import { fmtDate } from '../lib/lots'
+import { useCurrency } from '../context/CurrencyContext'
 import { useCensor } from '../context/CensorContext'
 import { exportLotsAsCsv } from '../lib/csvExport'
 import PortfolioSelector from '../components/portfolio/PortfolioSelector'
@@ -118,6 +119,7 @@ export default function Transactions() {
   const { lots, stats, loading, error, refresh } = useLots()
   const { activeId, active } = usePortfolio()
   const { mask } = useCensor()
+  const { fmt }  = useCurrency()
   const [modalOpen,  setModalOpen]  = useState(false)
   const [importOpen, setImportOpen] = useState(false)
 

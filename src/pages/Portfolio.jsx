@@ -7,7 +7,8 @@ import LotForm from '../components/portfolio/LotForm'
 import PerformanceChart from '../components/portfolio/PerformanceChart'
 import AllocationChart from '../components/portfolio/AllocationChart'
 import { useLots } from '../hooks/useLots'
-import { fmt, fmtDate, lotTotal } from '../lib/lots'
+import { fmtDate, lotTotal } from '../lib/lots'
+import { useCurrency } from '../context/CurrencyContext'
 import { useAuth } from '../context/AuthContext'
 import { useCensor } from '../context/CensorContext'
 import PortfolioSelector from '../components/portfolio/PortfolioSelector'
@@ -28,6 +29,7 @@ function PctBadge({ pct }) {
 function StatCard({ label, value, sub, icon: Icon, positive, negative, pct, toggle }) {
   const valueColor = positive ? 'text-positive' : negative ? 'text-negative' : 'text-text'
   const { censored } = useCensor()
+  const { fmt } = useCurrency()
   return (
     <div
       className="rounded-2xl border border-border p-5 hover:border-accent/30
@@ -56,6 +58,7 @@ function RecentLotRow({ lot }) {
   const isBuy  = lot.type === 'buy'
   const total  = lotTotal(lot)
   const { mask } = useCensor()
+  const { fmt }  = useCurrency()
   return (
     <div className="flex items-center justify-between py-3 border-b border-border-subtle last:border-0">
       <div className="flex items-center gap-3">
@@ -84,6 +87,7 @@ export default function Portfolio() {
   const { user }                                        = useAuth()
   const { lots, stats, prices, loading, pricesLoading, refresh } = useLots()
   const { mask }                                        = useCensor()
+  const { fmt }                                         = useCurrency()
   const [modalOpen, setModalOpen]                       = useState(false)
   const [chartTicker, setChartTicker]                   = useState(null)
   const [plMode, setPlMode]                             = useState('alltime') // 'alltime' | 'today'

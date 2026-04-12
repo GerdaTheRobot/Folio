@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { createChart, ColorType, CrosshairMode, AreaSeries } from 'lightweight-charts'
 import { GitCompareArrows } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
+import { useCurrency } from '../../context/CurrencyContext'
 import { fetchHistory, pollInterval } from '../../lib/priceHistory'
 
 const RANGES   = ['1D', '1W', '1M', '3M', '1Y', 'All']
@@ -41,9 +42,6 @@ function getColors(theme) {
   }
 }
 
-function fmtVal(v) {
-  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 /**
  * Fetches historical prices for every ticker in the portfolio and computes
@@ -141,10 +139,12 @@ async function fetchPortfolioHistory(lots, range, intraday, source, twelveKey) {
 }
 
 export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
-  const containerRef = useRef(null)
-  const chartRef     = useRef(null)
-  const seriesRef    = useRef(null)
-  const { theme }    = useTheme()
+  const containerRef  = useRef(null)
+  const chartRef      = useRef(null)
+  const seriesRef     = useRef(null)
+  const { theme }     = useTheme()
+  const { fmt: fmtCurrency, rate, symbol } = useCurrency()
+  const fmtVal = (v) => fmtCurrency(v)
 
   const [range, setRange]         = useState('1Y')
   const [intraday, setIntraday]   = useState('5m')

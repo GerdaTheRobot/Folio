@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
-import { BarChart2, Sun, Moon, LogOut, User, ChevronDown, Eye, EyeOff, Search, X } from 'lucide-react'
+import { BarChart2, Sun, Moon, LogOut, User, ChevronDown, Eye, EyeOff, Search, X, Settings } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import { useCensor } from '../../context/CensorContext'
 import { searchSymbols } from '../../lib/finnhub'
+import Modal from '../ui/Modal'
+import SettingsModal from '../ui/SettingsModal'
 
 const NAV_LINKS = [
   { label: 'Portfolio',     path: '/' },
@@ -156,8 +158,9 @@ export default function Navbar() {
   const { censored, toggle: toggleCensor }         = useCensor()
   const navigate                                   = useNavigate()
   const location                                   = useLocation()
-  const [menuOpen, setMenuOpen]                    = useState(false)
-  const menuRef                                    = useRef(null)
+  const [menuOpen,     setMenuOpen]     = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const menuRef                         = useRef(null)
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Account'
   const initials    = displayName.slice(0, 2).toUpperCase()
@@ -176,6 +179,7 @@ export default function Navbar() {
   }
 
   return (
+    <>
     <header
       className="sticky top-0 z-40 border-b border-border"
       style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)' }}
@@ -273,10 +277,12 @@ export default function Navbar() {
                   <p className="text-xs text-text-muted">Signed in as</p>
                   <p className="text-sm text-text font-medium truncate">{user?.email}</p>
                 </div>
-                <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary
-                                   hover:text-text hover:bg-bg-elevated transition-colors duration-150">
-                  <User size={15} />
-                  Account
+                <button
+                  onClick={() => { setMenuOpen(false); setSettingsOpen(true) }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary
+                             hover:text-text hover:bg-bg-elevated transition-colors duration-150">
+                  <Settings size={15} />
+                  Settings
                 </button>
                 <button
                   onClick={handleSignOut}
@@ -313,5 +319,10 @@ export default function Navbar() {
         </div>
       </div>
     </header>
+
+    <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Settings">
+      <SettingsModal />
+    </Modal>
+    </>
   )
 }

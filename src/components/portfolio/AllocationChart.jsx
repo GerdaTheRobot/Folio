@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
 import { useCensor } from '../../context/CensorContext'
+import { useCurrency } from '../../context/CurrencyContext'
 
 const PALETTE = [
   '#6c68f0', // accent purple (matches line chart)
@@ -14,9 +15,6 @@ const PALETTE = [
   '#facc15', // yellow
 ]
 
-function fmt(v) {
-  return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 /**
  * Returns the SVG path for a donut arc slice.
@@ -111,6 +109,7 @@ function sliceAtPoint(e, svgRef, slices, cx, cy, outerR, innerR) {
 
 export default function AllocationChart({ lots, prices }) {
   const { censored } = useCensor()
+  const { fmt }      = useCurrency()
   const [hovered, setHovered] = useState(null)
   const svgRef                = useRef(null)
   const slices                = useAllocations(lots, prices)

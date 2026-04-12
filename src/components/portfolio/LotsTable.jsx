@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Pencil, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { deleteLot, lotTotal, fmtDate, fmt } from '../../lib/lots'
+import { deleteLot, lotTotal, fmtDate } from '../../lib/lots'
 import Modal from '../ui/Modal'
 import LotForm from './LotForm'
 import { useCensor } from '../../context/CensorContext'
+import { useCurrency } from '../../context/CurrencyContext'
 
 function SortIcon({ field, sort }) {
   if (sort.field !== field) return <ChevronUp size={12} className="text-text-muted opacity-40" />
@@ -35,6 +36,7 @@ export default function LotsTable({ lots, onChanged }) {
   const [deleteId, setDeleteId]   = useState(null)
   const [deleting, setDeleting]   = useState(false)
   const { mask }                  = useCensor()
+  const { fmt }                   = useCurrency()
 
   function handleSort(field) {
     setSort(s => ({ field, dir: s.field === field && s.dir === 'asc' ? 'desc' : 'asc' }))

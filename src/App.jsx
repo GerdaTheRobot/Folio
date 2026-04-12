@@ -3,6 +3,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CensorProvider } from './context/CensorContext'
 import { PortfolioProvider } from './context/PortfolioContext'
+import { CurrencyProvider } from './context/CurrencyContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Portfolio from './pages/Portfolio'
@@ -47,11 +48,13 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
         <CensorProvider>
-          <AuthProvider>
-            <PortfolioProvider>
-              <AppRoutes />
-            </PortfolioProvider>
-          </AuthProvider>
+          <CurrencyProvider>
+            <AuthProvider>
+              <PortfolioProvider>
+                <AppRoutes />
+              </PortfolioProvider>
+            </AuthProvider>
+          </CurrencyProvider>
         </CensorProvider>
       </ThemeProvider>
     </BrowserRouter>

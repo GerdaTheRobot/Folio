@@ -7,12 +7,14 @@ import LotsTable from '../components/portfolio/LotsTable'
 import Modal from '../components/ui/Modal'
 import LotForm from '../components/portfolio/LotForm'
 import { useLots } from '../hooks/useLots'
-import { fmt, fmtDate } from '../lib/lots'
+import { fmtDate } from '../lib/lots'
 import { useCensor } from '../context/CensorContext'
+import { useCurrency } from '../context/CurrencyContext'
 
 function StatCard({ label, value, sub, icon: Icon, positive, negative, pct }) {
   const color = positive ? 'text-positive' : negative ? 'text-negative' : 'text-text'
   const { mask, censored } = useCensor()
+  const { fmt } = useCurrency()
   return (
     <div className="rounded-2xl border border-border p-5"
          style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)' }}>
@@ -42,6 +44,7 @@ export default function StockDetail() {
   const { ticker }                              = useParams()
   const { lots, stats, prices, prevCloses, loading, refresh } = useLots()
   const { mask }                                = useCensor()
+  const { fmt }                                 = useCurrency()
   const navigate                                = useNavigate()
   const [modalOpen, setModalOpen]               = useState(false)
   const [plMode, setPlMode]                     = useState('alltime')
