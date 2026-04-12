@@ -156,9 +156,7 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
   const [compareMode, setCompareMode] = useState(false)
   const [anchor, setAnchor]           = useState(null)   // { value, time, date }
   const [lockedEnd, setLockedEnd]     = useState(null)   // { value, time, date } — second clicked point
-  const [anchorDot, setAnchorDot]     = useState(null)   // { x, y } px in chart container
-  const [lockedDot, setLockedDot]     = useState(null)   // { x, y } px in chart container
-  // Bumped on every zoom/pan so compareRegionPath recomputes with fresh coordinates
+  // Bumped on every zoom/pan so coordinate-derived values recompute with fresh positions
   const [rangeVersion, setRangeVersion] = useState(0)
 
   // Refs so chart callbacks always see latest state
@@ -246,8 +244,6 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     if (!compareMode) {
       setAnchor(null)
       setLockedEnd(null)
-      setAnchorDot(null)
-      setLockedDot(null)
     }
   }, [compareMode])
 
@@ -306,8 +302,6 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
       if (!param?.time || !param.seriesData?.size) {
         setAnchor(null)
         setLockedEnd(null)
-        setAnchorDot(null)
-        setLockedDot(null)
         return
       }
 
@@ -321,15 +315,11 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
       if (currentAnchor && currentLocked) {
         setAnchor(null)
         setLockedEnd(null)
-        setAnchorDot(null)
-        setLockedDot(null)
         return
       }
 
       // State 1 (anchor set, not locked) → lock in second point
       if (currentAnchor && !currentLocked) {
-        const y = series.priceToCoordinate(val) ?? param.point?.y
-        setLockedDot({ x: param.point?.x ?? 0, y: y ?? 0 })
         setLockedEnd({
           value: val,
           time:  param.time,
@@ -342,9 +332,6 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
       }
 
       // State 0 (no anchor) → set anchor
-      const y = series.priceToCoordinate(val) ?? param.point?.y
-      setAnchorDot({ x: param.point?.x ?? 0, y: y ?? 0 })
-
       setAnchor({
         value: val,
         time:  param.time,
@@ -438,6 +425,23 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     const line   = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
     return `${line} L${lastX.toFixed(1)},300 L${firstX.toFixed(1)},300 Z`
   }, [anchor, lockedEnd, visiblePoints, rangeVersion])
+
+  // Dot + dashed-line positions — recomputed on zoom/pan via rangeVersion
+  const anchorDot = useMemo(() => {
+    if (!anchor || !chartRef.current || !seriesRef.current) return null
+    const x = chartRef.current.timeScale().timeToCoordinate(anchor.time)
+    const y = seriesRef.current.priceToCoordinate(anchor.value)
+    if (x == null || y == null) return null
+    return { x, y }
+  }, [anchor, rangeVersion])
+
+  const lockedDot = useMemo(() => {
+    if (!lockedEnd || !chartRef.current || !seriesRef.current) return null
+    const x = chartRef.current.timeScale().timeToCoordinate(lockedEnd.time)
+    const y = seriesRef.current.priceToCoordinate(lockedEnd.value)
+    if (x == null || y == null) return null
+    return { x, y }
+  }, [lockedEnd, rangeVersion])
 
   const pollSecs = pollInterval(range, intraday) ? pollInterval(range, intraday) / 1000 : null
 
