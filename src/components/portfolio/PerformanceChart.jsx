@@ -8,6 +8,24 @@ const RANGES   = ['1D', '1W', '1M', '3M', '1Y', 'All']
 const INTRADAY = ['1m', '5m', '1h']
 const SOURCES  = ['Yahoo', 'Twelve Data']
 
+function getMarketStatus() {
+  const now   = new Date()
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour:    'numeric',
+    minute:  '2-digit',
+    hour12:  false,
+  }).formatToParts(now)
+  const weekday   = parts.find(p => p.type === 'weekday')?.value ?? ''
+  const hour      = parseInt(parts.find(p => p.type === 'hour')?.value   ?? '0', 10)
+  const minute    = parseInt(parts.find(p => p.type === 'minute')?.value ?? '0', 10)
+  const totalMins = hour * 60 + minute
+  const isWeekend = weekday === 'Sat' || weekday === 'Sun'
+  const isOpen    = !isWeekend && totalMins >= 9 * 60 + 30 && totalMins < 16 * 60
+  return { isOpen, isWeekend }
+}
+
 function getColors(theme) {
   const dark = theme === 'dark'
   return {
@@ -27,40 +45,99 @@ function fmtVal(v) {
   return '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function buildCostBasisData(lots, prices = {}) {
+/**
+ * Fetches historical prices for every ticker in the portfolio and computes
+ * the total portfolio market value at each trading day/interval.
+ *
+ * For each timestamp T in the combined price history:
+ *   - Determine which tickers were held at T (and how many shares)
+ *   - Look up each ticker's price at T
+ *   - Sum shares × price across all open positions
+ */
+async function fetchPortfolioHistory(lots, range, intraday, source, twelveKey) {
   if (!lots.length) return []
-  const sorted = [...lots].sort((a, b) => new Date(a.executed_at) - new Date(b.executed_at))
-  const state  = {}
-  const points = []
+
+  const tickers = [...new Set(lots.map(l => l.ticker))]
+
+  // Fetch price history for all tickers in parallel; ignore failures gracefully
+  const settled = await Promise.allSettled(
+    tickers.map(t =>
+      fetchHistory(source, t, range, intraday, twelveKey).then(pts => ({ ticker: t, pts }))
+    )
+  )
+  const histories = settled
+    .filter(r => r.status === 'fulfilled')
+    .map(r => r.value)
+    .filter(h => h.pts.length > 0)
+
+  if (!histories.length) return []
+
+  // Build portfolio state snapshots sorted by lot date (ascending)
+  const sorted    = [...lots].sort((a, b) => new Date(a.executed_at) - new Date(b.executed_at))
+  const firstTime = Math.floor(new Date(sorted[0].executed_at).getTime() / 1000)
+
+  const snapshots = []   // [{ time, state: { ticker: shares } }]
+  const cur       = {}   // mutable running state
 
   for (const lot of sorted) {
-    const t = lot.ticker, qty = Number(lot.shares), px = Number(lot.price), fees = Number(lot.fees) || 0
-    if (!state[t]) state[t] = { totalShares: 0, totalCost: 0 }
-    if (lot.type === 'buy') {
-      state[t].totalShares += qty
-      state[t].totalCost   += qty * px + fees
-    } else {
-      const avg = state[t].totalShares > 0 ? state[t].totalCost / state[t].totalShares : 0
-      state[t].totalShares = Math.max(0, state[t].totalShares - qty)
-      state[t].totalCost   = Math.max(0, state[t].totalCost - qty * avg)
-    }
-    const totalBasis = Object.values(state).reduce((s, v) => s + v.totalCost, 0)
-    const time       = Math.floor(new Date(lot.executed_at).getTime() / 1000)
-    if (points.length && points[points.length - 1].time === time) {
-      points[points.length - 1].value = totalBasis
-    } else {
-      points.push({ time, value: totalBasis })
-    }
+    const t = lot.ticker
+    cur[t] = (cur[t] ?? 0) + (lot.type === 'buy' ? +lot.shares : -+lot.shares)
+    if (cur[t] < 0) cur[t] = 0
+    snapshots.push({ time: Math.floor(new Date(lot.executed_at).getTime() / 1000), state: { ...cur } })
   }
 
-  const haveAllPrices = Object.keys(state).every(t => prices[t] != null && state[t].totalShares > 0)
-  const todayTs = Math.floor(Date.now() / 1000)
-  const lastTs  = points[points.length - 1]?.time ?? 0
-  if (haveAllPrices && todayTs > lastTs) {
-    const marketValue = Object.entries(state).reduce((s, [t, v]) => s + (prices[t] ?? 0) * v.totalShares, 0)
-    points.push({ time: todayTs, value: marketValue })
+  // Binary search: last portfolio snapshot at or before ts
+  function stateAt(ts) {
+    let lo = 0, hi = snapshots.length - 1, s = null
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (snapshots[mid].time <= ts) { s = snapshots[mid].state; lo = mid + 1 }
+      else hi = mid - 1
+    }
+    return s
   }
-  return points
+
+  // Per-ticker sorted price arrays for binary-search lookups
+  const priceArrays = {}
+  for (const { ticker, pts } of histories) {
+    priceArrays[ticker] = [...pts].sort((a, b) => a.time - b.time)
+  }
+
+  // Binary search: last known price at or before ts
+  function priceAt(ticker, ts) {
+    const arr = priceArrays[ticker]
+    if (!arr?.length) return null
+    let lo = 0, hi = arr.length - 1, val = null
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1
+      if (arr[mid].time <= ts) { val = arr[mid].value; lo = mid + 1 }
+      else hi = mid - 1
+    }
+    return val
+  }
+
+  // Union of all timestamps across all tickers, ascending
+  const allTimes = [
+    ...new Set(histories.flatMap(h => h.pts.map(p => p.time))),
+  ].sort((a, b) => a - b)
+
+  const output = []
+  for (const ts of allTimes) {
+    if (ts < firstTime) continue          // before the portfolio existed
+    const state = stateAt(ts)
+    if (!state) continue
+
+    let total = 0, anyOpen = false
+    for (const [t, shares] of Object.entries(state)) {
+      if (shares <= 0) continue
+      anyOpen = true
+      const p = priceAt(t, ts)
+      if (p != null) total += shares * p
+    }
+    if (anyOpen && total > 0) output.push({ time: ts, value: total })
+  }
+
+  return output
 }
 
 export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
@@ -96,8 +173,16 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
   const twelveKey = import.meta.env.VITE_TWELVEDATA_API_KEY ?? null
   const is1D      = range === '1D'
 
-  const costBasisPoints = useMemo(() => buildCostBasisData(lots, prices), [lots, prices])
+  // Market status — computed once on mount (re-render on range change is fine)
+  const marketStatus = useMemo(() => getMarketStatus(), [])
 
+  // '1D' is only meaningful for individual ticker charts — reset to '1W' in portfolio mode
+  useEffect(() => {
+    if (!ticker && range === '1D') setRange('1W')
+  }, [ticker, range])
+
+  // Fetch: ticker mode → single-ticker price history
+  //        portfolio mode → fetchPortfolioHistory for all held tickers
   const doFetch = useCallback(() => {
     if (!ticker) return
     setFetching(true); setFetchErr(null)
@@ -107,15 +192,21 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
   }, [ticker, range, intraday, source, twelveKey])
 
   useEffect(() => {
-    if (!ticker) { setHistData(null); setFetchErr(null); return }
     let cancelled = false
-    setFetching(true); setFetchErr(null)
-    fetchHistory(source, ticker, range, intraday, twelveKey)
+    setFetching(true); setFetchErr(null); setHistData(null)
+
+    const promise = ticker
+      ? fetchHistory(source, ticker, range, intraday, twelveKey)
+      : fetchPortfolioHistory(lots, range, intraday, source, twelveKey)
+
+    promise
       .then(pts  => { if (!cancelled) { setHistData(pts); setFetching(false) } })
       .catch(err => { if (!cancelled) { setFetchErr(err.message); setFetching(false) } })
     return () => { cancelled = true }
-  }, [ticker, range, intraday, source, twelveKey])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticker, lots, range, intraday, source, twelveKey])
 
+  // Polling for 1D intraday ticker view only
   useEffect(() => {
     const ms = pollInterval(range, intraday)
     if (!ms || !ticker) return
@@ -123,18 +214,28 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     return () => clearInterval(id)
   }, [range, intraday, ticker, doFetch])
 
+  // In portfolio mode, append a live-price "now" point so the endpoint
+  // reflects today's market value (historical data only goes to last close)
   const visiblePoints = useMemo(() => {
-    if (ticker) return histData ?? []
-    const days = { '1W': 7, '1M': 30, '3M': 90, '1Y': 365, 'All': null }[range]
-    if (!days) return costBasisPoints
-    const cutoff = Math.floor(Date.now() / 1000 - days * 86400)
-    const after  = costBasisPoints.filter(p => p.time >= cutoff)
-    // Carry the last known value before the cutoff as the range-start anchor point
-    // so the chart always has a starting value even when there's no lot activity in the period
-    const lastBefore = [...costBasisPoints].reverse().find(p => p.time < cutoff)
-    if (lastBefore) return [{ time: cutoff, value: lastBefore.value }, ...after]
-    return after
-  }, [ticker, histData, costBasisPoints, range])
+    const pts = histData ?? []
+    if (!ticker && pts.length > 0) {
+      const finalShares = {}
+      for (const lot of [...lots].sort((a, b) => new Date(a.executed_at) - new Date(b.executed_at))) {
+        finalShares[lot.ticker] = (finalShares[lot.ticker] ?? 0) +
+          (lot.type === 'buy' ? +lot.shares : -+lot.shares)
+      }
+      let currentValue = 0, hasPrices = false
+      for (const [t, shares] of Object.entries(finalShares)) {
+        if (shares > 0 && prices[t] != null) { currentValue += shares * prices[t]; hasPrices = true }
+      }
+      if (hasPrices && currentValue > 0) {
+        const nowTs  = Math.floor(Date.now() / 1000)
+        const lastTs = pts[pts.length - 1]?.time ?? 0
+        if (nowTs > lastTs) return [...pts, { time: nowTs, value: currentValue }]
+      }
+    }
+    return pts
+  }, [histData, ticker, lots, prices])
 
   const isEmpty = visiblePoints.length < 2
 
@@ -339,6 +440,14 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
             {ticker ? `${ticker} Price` : 'Portfolio Value'}
           </h2>
 
+          {/* Market closed badge */}
+          {!marketStatus.isOpen && (
+            <span className="flex items-center gap-1 text-xs text-text-muted bg-bg-elevated border border-border px-2 py-0.5 rounded-full shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-negative inline-block" />
+              {marketStatus.isWeekend ? 'Market closed' : 'After hours'}
+            </span>
+          )}
+
           {/* Normal tooltip */}
           {!compareMode && tooltip && (
             <span className="text-sm tabular-nums">
@@ -440,7 +549,7 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
 
           {/* Range buttons */}
           <div className="flex gap-1">
-            {RANGES.map(r => (
+            {(ticker ? RANGES : RANGES.filter(r => r !== '1D')).map(r => (
               <button key={r} onClick={() => setRange(r)}
                 className={[
                   'px-2.5 py-1 rounded-md text-xs font-medium transition-colors duration-150',
@@ -527,7 +636,7 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
         {!fetching && !fetchErr && isEmpty && (
           <div className="absolute inset-0 flex items-center justify-center bg-bg-elevated rounded-xl">
             <p className="text-sm text-text-muted">
-              {!ticker && costBasisPoints.length < 2 ? 'Add buy lots to see performance' : 'No data in selected range'}
+              {!ticker && !lots.length ? 'Add buy lots to see performance' : 'No data in selected range'}
             </p>
           </div>
         )}

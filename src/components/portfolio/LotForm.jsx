@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { addLot, updateLot } from '../../lib/lots'
 import { usePortfolio } from '../../context/PortfolioContext'
+import { searchSymbols } from '../../lib/finnhub'
+import { X } from 'lucide-react'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -17,6 +19,7 @@ const EMPTY = {
 export default function LotForm({ initial = null, onSuccess, onCancel }) {
   const { activeId } = usePortfolio()
   const isEdit = Boolean(initial)
+
   const [form, setForm]     = useState(isEdit ? {
     ...initial,
     executed_at: initial.executed_at?.slice(0, 10) ?? today(),
@@ -26,8 +29,96 @@ export default function LotForm({ initial = null, onSuccess, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
+  // Ticker autocomplete state
+  const [tickerQuery, setTickerQuery]       = useState(isEdit ? initial.ticker : '')
+  const [tickerResults, setTickerResults]   = useState([])
+  const [tickerOpen, setTickerOpen]         = useState(false)
+  const [tickerLoading, setTickerLoading]   = useState(false)
+  const [tickerConfirmed, setTickerConfirmed] = useState(isEdit) // edit mode: already valid
+  const [activeIndex, setActiveIndex]       = useState(-1)
+
+  const debounceRef    = useRef(null)
+  const tickerInputRef = useRef(null)
+  const tickerContRef  = useRef(null)
+  const itemRefs       = useRef([])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handle(e) {
+      if (tickerContRef.current && !tickerContRef.current.contains(e.target)) {
+        setTickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  // Reset active index when results change
+  useEffect(() => { setActiveIndex(-1) }, [tickerResults])
+
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function handleTickerChange(e) {
+    const val = e.target.value.toUpperCase()
+    setTickerQuery(val)
+    setTickerConfirmed(false)
+    set('ticker', '')
+    clearTimeout(debounceRef.current)
+    if (!val.trim()) { setTickerResults([]); setTickerOpen(false); return }
+    setTickerLoading(true)
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await searchSymbols(val.trim())
+        setTickerResults(res)
+        setTickerOpen(res.length > 0)
+      } catch { setTickerResults([]) }
+      finally  { setTickerLoading(false) }
+    }, 280)
+  }
+
+  function selectTicker(symbol, description) {
+    setTickerQuery(symbol)
+    set('ticker', symbol)
+    setTickerConfirmed(true)
+    setTickerResults([])
+    setTickerOpen(false)
+    setActiveIndex(-1)
+  }
+
+  function clearTicker() {
+    setTickerQuery('')
+    set('ticker', '')
+    setTickerConfirmed(false)
+    setTickerResults([])
+    setTickerOpen(false)
+    tickerInputRef.current?.focus()
+  }
+
+  function handleTickerKeyDown(e) {
+    if (e.key === 'Escape') { setTickerOpen(false); setActiveIndex(-1); return }
+    if (!tickerOpen || !tickerResults.length) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveIndex(i => {
+        const next = Math.min(i + 1, tickerResults.length - 1)
+        itemRefs.current[next]?.scrollIntoView({ block: 'nearest' })
+        return next
+      })
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveIndex(i => {
+        if (i <= 0) return -1
+        const prev = i - 1
+        itemRefs.current[prev]?.scrollIntoView({ block: 'nearest' })
+        return prev
+      })
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      const idx = activeIndex >= 0 ? activeIndex : 0
+      if (tickerResults[idx]) selectTicker(tickerResults[idx].symbol, tickerResults[idx].description)
+    }
   }
 
   async function handleSubmit(e) {
@@ -38,16 +129,16 @@ export default function LotForm({ initial = null, onSuccess, onCancel }) {
     const price  = Number(form.price)
     const fees   = Number(form.fees) || 0
 
-    if (!form.ticker.trim())     return setError('Ticker is required.')
+    if (!tickerConfirmed && !isEdit) return setError('Please select a valid ticker from the search results.')
     if (isNaN(shares) || shares <= 0) return setError('Shares must be a positive number.')
     if (isNaN(price)  || price  <= 0) return setError('Price must be a positive number.')
-    if (fees < 0)                return setError('Fees cannot be negative.')
+    if (fees < 0)                     return setError('Fees cannot be negative.')
 
     setLoading(true)
     try {
       const payload = {
         type:        form.type,
-        ticker:      form.ticker.trim().toUpperCase(),
+        ticker:      (isEdit ? form.ticker : form.ticker).trim().toUpperCase(),
         shares,
         price,
         fees,
@@ -104,21 +195,81 @@ export default function LotForm({ initial = null, onSuccess, onCancel }) {
 
       {/* Ticker + Date row */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
+
+        {/* Ticker field — autocomplete when adding, read-only when editing */}
+        <div className="flex flex-col gap-1.5" ref={tickerContRef}>
           <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
             Ticker
           </label>
-          <input
-            type="text"
-            value={form.ticker}
-            onChange={e => set('ticker', e.target.value.toUpperCase())}
-            maxLength={10}
-            placeholder="AAPL"
-            className="w-full rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5
-                       text-sm text-text placeholder:text-text-muted outline-none font-mono
-                       focus:border-accent focus:ring-2 focus:ring-accent/20 transition-colors duration-150"
-          />
+
+          {isEdit ? (
+            <input
+              type="text"
+              value={form.ticker}
+              disabled
+              className="w-full rounded-lg border border-border bg-bg-elevated px-3.5 py-2.5
+                         text-sm text-text-muted outline-none font-mono opacity-70 cursor-not-allowed"
+            />
+          ) : (
+            <div className="relative">
+              <div className={[
+                'flex items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors duration-150',
+                tickerConfirmed
+                  ? 'border-accent bg-bg-elevated ring-2 ring-accent/20'
+                  : 'border-border bg-bg-elevated focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+              ].join(' ')}>
+                <input
+                  ref={tickerInputRef}
+                  type="text"
+                  value={tickerQuery}
+                  onChange={handleTickerChange}
+                  onKeyDown={handleTickerKeyDown}
+                  onFocus={() => { if (tickerResults.length) setTickerOpen(true) }}
+                  placeholder="AAPL"
+                  autoComplete="off"
+                  maxLength={10}
+                  className="flex-1 min-w-0 bg-transparent text-sm text-text placeholder:text-text-muted
+                             outline-none font-mono"
+                />
+                {tickerLoading && (
+                  <div className="w-3 h-3 rounded-full border-2 border-border border-t-accent animate-spin shrink-0" />
+                )}
+                {tickerConfirmed && (
+                  <button type="button" onClick={clearTicker}
+                    className="text-text-muted hover:text-text transition-colors duration-150 shrink-0">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown */}
+              {tickerOpen && tickerResults.length > 0 && (
+                <div
+                  className="absolute top-full left-0 right-0 mt-1 rounded-xl border border-border py-1 z-50 overflow-y-auto"
+                  style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', maxHeight: 200 }}
+                >
+                  {tickerResults.map((r, i) => (
+                    <button
+                      key={r.symbol}
+                      type="button"
+                      ref={el => { itemRefs.current[i] = el }}
+                      onMouseDown={() => selectTicker(r.symbol, r.description)}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      className={[
+                        'w-full flex items-center gap-2 px-3 py-2 text-left transition-colors duration-100',
+                        activeIndex === i ? 'bg-bg-elevated' : 'hover:bg-bg-elevated',
+                      ].join(' ')}
+                    >
+                      <span className="font-mono font-semibold text-sm text-text w-14 shrink-0">{r.symbol}</span>
+                      <span className="text-xs text-text-secondary truncate">{r.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
             Date

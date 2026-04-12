@@ -155,7 +155,7 @@ export default function Portfolio() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard
               label="Market Value"
               value={mask(hasValue ? fmt(stats.totalValue) : fmt(stats.totalCostBasis))}
@@ -199,11 +199,11 @@ export default function Portfolio() {
           >
             {/* Ticker selector */}
             {!loading && heldTickers.length > 0 && (
-              <div className="flex gap-1">
+              <div className="flex gap-1 overflow-x-auto pb-0.5 -mb-0.5" style={{ scrollbarWidth: 'none' }}>
                 <button
                   onClick={() => setChartTicker(null)}
                   className={[
-                    'px-2.5 py-1 rounded-md text-xs font-medium transition-colors duration-150',
+                    'px-2.5 py-1 rounded-md text-xs font-medium transition-colors duration-150 shrink-0',
                     chartTicker === null
                       ? 'bg-accent-subtle text-accent'
                       : 'text-text-secondary hover:text-text hover:bg-bg-elevated',
@@ -216,7 +216,7 @@ export default function Portfolio() {
                     key={t}
                     onClick={() => setChartTicker(t)}
                     className={[
-                      'px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-colors duration-150',
+                      'px-2.5 py-1 rounded-md text-xs font-mono font-medium transition-colors duration-150 shrink-0',
                       chartTicker === t
                         ? 'bg-accent-subtle text-accent'
                         : 'text-text-secondary hover:text-text hover:bg-bg-elevated',

@@ -179,7 +179,9 @@ export default function Navbar() {
       className="sticky top-0 z-40 border-b border-border"
       style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)' }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center h-16 gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Main row */}
+        <div className="flex items-center h-16 gap-4">
 
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 shrink-0 group">
@@ -190,7 +192,7 @@ export default function Navbar() {
           <span className="font-semibold text-base tracking-tight text-text">Folio</span>
         </Link>
 
-        {/* Nav links */}
+        {/* Nav links — desktop only */}
         <nav className="hidden sm:flex items-center gap-1">
           {NAV_LINKS.map(({ label, path }) => {
             const active = location.pathname === path
@@ -287,6 +289,24 @@ export default function Navbar() {
             )}
           </div>
         </div>
+        </div>{/* end main row */}
+
+        {/* Mobile nav row — visible only on small screens */}
+        <nav className="flex sm:hidden items-center gap-1 pb-2">
+          {NAV_LINKS.map(({ label, path }) => {
+            const active = location.pathname === path
+            return (
+              <Link key={path} to={path}
+                className={[
+                  'px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-150',
+                  active ? 'bg-accent-subtle text-accent' : 'text-text-secondary hover:text-text hover:bg-bg-elevated',
+                ].join(' ')}
+              >
+                {label}
+              </Link>
+            )
+          })}
+        </nav>
       </div>
     </header>
   )
