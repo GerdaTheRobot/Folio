@@ -34,15 +34,13 @@ function StatCard({ label, value, sub, icon: Icon, positive, negative, pct, togg
                  transition-colors duration-200"
       style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)' }}
     >
-      <div className="flex items-start justify-between gap-1 mb-3 flex-wrap">
-        <span className="text-xs font-medium text-text-muted uppercase tracking-wide min-w-0 leading-5">{label}</span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {toggle}
-          <div className="w-8 h-8 rounded-lg bg-accent-subtle flex items-center justify-center">
-            <Icon size={15} className="text-accent" />
-          </div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium text-text-muted uppercase tracking-wide min-w-0 mr-2 truncate">{label}</span>
+        <div className="w-8 h-8 rounded-lg bg-accent-subtle flex items-center justify-center shrink-0">
+          <Icon size={15} className="text-accent" />
         </div>
       </div>
+      {toggle && <div className="mb-2 w-fit">{toggle}</div>}
       <div className="flex items-end gap-2 flex-wrap">
         <p className={`text-xl sm:text-2xl font-semibold tracking-tight tabular-nums min-w-0 ${valueColor} ${censored ? 'tracking-widest' : ''}`}>
           {value}
