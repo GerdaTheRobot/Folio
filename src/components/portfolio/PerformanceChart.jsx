@@ -158,6 +158,8 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
   const [lockedEnd, setLockedEnd]     = useState(null)   // { value, time, date } — second clicked point
   const [anchorDot, setAnchorDot]     = useState(null)   // { x, y } px in chart container
   const [lockedDot, setLockedDot]     = useState(null)   // { x, y } px in chart container
+  // Bumped on every zoom/pan so compareRegionPath recomputes with fresh coordinates
+  const [rangeVersion, setRangeVersion] = useState(0)
 
   // Refs so chart callbacks always see latest state
   const compareModeRef = useRef(false)
@@ -355,11 +357,19 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     chartRef.current  = chart
     seriesRef.current = series
 
+    // Recompute the compare region path whenever the user zooms or pans
+    const onRangeChange = () => setRangeVersion(v => v + 1)
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange)
+
     const ro = new ResizeObserver(() => {
       if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth })
     })
     ro.observe(containerRef.current)
-    return () => { ro.disconnect(); chart.remove() }
+    return () => {
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange)
+      ro.disconnect()
+      chart.remove()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -427,7 +437,7 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     const lastX  = pts[pts.length - 1].x
     const line   = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
     return `${line} L${lastX.toFixed(1)},300 L${firstX.toFixed(1)},300 Z`
-  }, [anchor, lockedEnd, visiblePoints])
+  }, [anchor, lockedEnd, visiblePoints, rangeVersion])
 
   const pollSecs = pollInterval(range, intraday) ? pollInterval(range, intraday) / 1000 : null
 
