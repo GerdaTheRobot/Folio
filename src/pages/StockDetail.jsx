@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { TrendingUp, TrendingDown, DollarSign, Layers, ArrowLeft } from 'lucide-react'
 import Navbar from '../components/layout/Navbar'
 import PerformanceChart from '../components/portfolio/PerformanceChart'
@@ -42,6 +42,7 @@ export default function StockDetail() {
   const { ticker }                              = useParams()
   const { lots, stats, prices, prevCloses, loading, refresh } = useLots()
   const { mask }                                = useCensor()
+  const navigate                                = useNavigate()
   const [modalOpen, setModalOpen]               = useState(false)
   const [plMode, setPlMode]                     = useState('alltime')
 
@@ -68,13 +69,13 @@ export default function StockDetail() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              to="/transactions"
+            <button
+              onClick={() => navigate(-1)}
               className="w-9 h-9 flex items-center justify-center rounded-lg border border-border
                          text-text-secondary hover:text-text hover:bg-bg-elevated transition-colors duration-150"
             >
               <ArrowLeft size={16} />
-            </Link>
+            </button>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-semibold text-text font-mono">{symbol}</h1>
@@ -106,7 +107,7 @@ export default function StockDetail() {
 
         {/* Stat cards — only if we have a position */}
         {holding && (
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <StatCard
               label="Market Value"
               value={mask(holding.currentValue != null ? fmt(holding.currentValue) : fmt(holding.costBasis))}
