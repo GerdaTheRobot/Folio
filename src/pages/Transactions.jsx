@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, BarChart2, RefreshCw, ChevronDown, Archive } from 'lucide-react'
+import { Plus, BarChart2, RefreshCw, ChevronDown, Archive, Upload, Download } from 'lucide-react'
 import Navbar from '../components/layout/Navbar'
 import Modal from '../components/ui/Modal'
 import LotForm from '../components/portfolio/LotForm'
 import LotsTable from '../components/portfolio/LotsTable'
+import ImportModal from '../components/portfolio/ImportModal'
 import { useLots } from '../hooks/useLots'
+import { usePortfolio } from '../context/PortfolioContext'
 import { fmt, fmtDate } from '../lib/lots'
 import { useCensor } from '../context/CensorContext'
+import { exportLotsAsCsv } from '../lib/csvExport'
 import PortfolioSelector from '../components/portfolio/PortfolioSelector'
 
 function StatCard({ label, value, sub, valueColor }) {
@@ -113,8 +116,10 @@ function PreviouslyOwned({ previousHoldings, mask }) {
 
 export default function Transactions() {
   const { lots, stats, loading, error, refresh } = useLots()
+  const { activeId, active } = usePortfolio()
   const { mask } = useCensor()
-  const [modalOpen, setModalOpen] = useState(false)
+  const [modalOpen,  setModalOpen]  = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
 
   const plColor = stats.totalRealizedPL > 0
     ? 'text-positive'
@@ -143,6 +148,28 @@ export default function Transactions() {
               title="Refresh"
             >
               <RefreshCw size={15} />
+            </button>
+            <button
+              onClick={() => exportLotsAsCsv(lots, active?.name)}
+              disabled={lots.length === 0}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border
+                         text-text-secondary hover:text-text hover:bg-bg-elevated
+                         text-sm font-medium transition-colors duration-150 active:scale-95
+                         disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Export CSV"
+            >
+              <Upload size={15} />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border
+                         text-text-secondary hover:text-text hover:bg-bg-elevated
+                         text-sm font-medium transition-colors duration-150 active:scale-95"
+              title="Import CSV"
+            >
+              <Download size={15} />
+              <span className="hidden sm:inline">Import</span>
             </button>
             <button
               onClick={() => setModalOpen(true)}
@@ -224,6 +251,19 @@ export default function Transactions() {
         <LotForm
           onSuccess={() => { setModalOpen(false); refresh() }}
           onCancel={() => setModalOpen(false)}
+        />
+      </Modal>
+
+      {/* Import modal */}
+      <Modal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import transactions"
+        maxWidth="max-w-xl"
+      >
+        <ImportModal
+          portfolioId={activeId}
+          onSuccess={() => { setImportOpen(false); refresh() }}
         />
       </Modal>
     </div>
