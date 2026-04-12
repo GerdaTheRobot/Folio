@@ -5,6 +5,7 @@ import Navbar from '../components/layout/Navbar'
 import Modal from '../components/ui/Modal'
 import LotForm from '../components/portfolio/LotForm'
 import PerformanceChart from '../components/portfolio/PerformanceChart'
+import AllocationChart from '../components/portfolio/AllocationChart'
 import { useLots } from '../hooks/useLots'
 import { fmt, fmtDate, lotTotal } from '../lib/lots'
 import { useAuth } from '../context/AuthContext'
@@ -228,6 +229,14 @@ export default function Portfolio() {
               </div>
             )}
             <PerformanceChart lots={lots} prices={prices} ticker={chartTicker} />
+
+            {/* Allocation chart — always visible regardless of ticker tab */}
+            {!loading && lots.length > 0 && (
+              <>
+                <div className="border-t border-border/60 my-1" />
+                <AllocationChart lots={lots} prices={prices} />
+              </>
+            )}
           </div>
 
           {/* Recent activity */}
