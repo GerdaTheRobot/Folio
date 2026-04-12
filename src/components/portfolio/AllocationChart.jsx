@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useCensor } from '../../context/CensorContext'
 
 const PALETTE = [
@@ -88,16 +88,42 @@ function useAllocations(lots, prices) {
   }, [lots, prices])
 }
 
+/**
+ * Given a mouse event on the SVG, return the ticker of the slice under the cursor.
+ * Uses angle + radial distance from center — completely gap-agnostic so hover
+ * never flickers when crossing the visual gaps between slices.
+ */
+function sliceAtPoint(e, svgRef, slices, cx, cy, outerR, innerR) {
+  const svg = svgRef.current
+  if (!svg) return null
+  const rect  = svg.getBoundingClientRect()
+  const x     = (e.clientX - rect.left) * (180 / rect.width)  - cx
+  const y     = (e.clientY - rect.top)  * (180 / rect.height) - cy
+  const dist  = Math.sqrt(x * x + y * y)
+  if (dist < innerR || dist > outerR) return null   // outside the ring
+
+  // Angle in degrees: 0 = top (12 o'clock), increases clockwise
+  let angle = Math.atan2(y, x) * (180 / Math.PI) + 90
+  if (angle < 0) angle += 360
+
+  return slices.find(s => angle >= s.startDeg && angle < s.endDeg)?.ticker ?? null
+}
+
 export default function AllocationChart({ lots, prices }) {
   const { censored } = useCensor()
-  const [hovered, setHovered]   = useState(null)
-  const slices                  = useAllocations(lots, prices)
-  const hoveredSlice            = hovered ? slices.find(s => s.ticker === hovered) ?? null : null
+  const [hovered, setHovered] = useState(null)
+  const svgRef                = useRef(null)
+  const slices                = useAllocations(lots, prices)
+  const hoveredSlice          = hovered ? slices.find(s => s.ticker === hovered) ?? null : null
 
   if (!slices.length) return null
 
   const cx = 90, cy = 90, outerR = 84, innerR = 52
   const single = slices.length === 1
+
+  function handleSvgMove(e) {
+    setHovered(sliceAtPoint(e, svgRef, slices, cx, cy, outerR, innerR))
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -110,18 +136,16 @@ export default function AllocationChart({ lots, prices }) {
 
         {/* ── Donut ── */}
         <div className="relative shrink-0" style={{ width: 180, height: 180 }}>
-          <svg width="180" height="180" viewBox="0 0 180 180" style={{ overflow: 'visible' }}>
+          <svg
+            ref={svgRef}
+            width="180" height="180" viewBox="0 0 180 180"
+            style={{ overflow: 'visible', cursor: 'default' }}
+            onMouseMove={handleSvgMove}
+            onMouseLeave={() => setHovered(null)}
+          >
             {single ? (
-              /* Single position — full ring */
               <>
-                <circle
-                  cx={cx} cy={cy} r={outerR}
-                  fill={slices[0].color}
-                  opacity={1}
-                  className="cursor-pointer"
-                  onMouseEnter={() => setHovered(slices[0].ticker)}
-                  onMouseLeave={() => setHovered(null)}
-                />
+                <circle cx={cx} cy={cy} r={outerR} fill={slices[0].color} />
                 <circle cx={cx} cy={cy} r={innerR} fill="var(--bg-card)" />
               </>
             ) : (
@@ -134,13 +158,10 @@ export default function AllocationChart({ lots, prices }) {
                     d={d}
                     fill={s.color}
                     opacity={hovered === null || hovered === s.ticker ? 1 : 0.25}
-                    className="transition-opacity duration-150 cursor-pointer"
                     style={{
-                      filter: hovered === s.ticker ? 'brightness(1.15)' : 'none',
-                      transition: 'opacity 150ms, filter 150ms',
+                      filter:     hovered === s.ticker ? 'brightness(1.15)' : 'none',
+                      transition: 'opacity 120ms, filter 120ms',
                     }}
-                    onMouseEnter={() => setHovered(s.ticker)}
-                    onMouseLeave={() => setHovered(null)}
                   />
                 )
               })
@@ -155,16 +176,16 @@ export default function AllocationChart({ lots, prices }) {
                 <span className="text-lg font-bold text-text leading-tight">
                   {hoveredSlice.pct.toFixed(1)}%
                 </span>
-                {!censored && (
-                  <span className="text-xs text-text-muted mt-0.5">{fmt(hoveredSlice.value)}</span>
-                )}
+                <span className="text-xs text-text-muted mt-0.5">
+                  {censored ? '••••••' : fmt(hoveredSlice.value)}
+                </span>
               </>
             ) : (
               <>
                 <span className="text-xs text-text-muted">Total</span>
-                {!censored && slices[0]?.total != null && (
-                  <span className="text-sm font-semibold text-text">{fmt(slices[0].total)}</span>
-                )}
+                <span className="text-sm font-semibold text-text">
+                  {censored ? '••••••' : fmt(slices[0].total)}
+                </span>
               </>
             )}
           </div>
@@ -176,17 +197,14 @@ export default function AllocationChart({ lots, prices }) {
             <div
               key={s.ticker}
               className={[
-                'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-100 cursor-default group',
+                'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-100 cursor-default',
                 hovered === s.ticker ? 'bg-bg-elevated' : 'hover:bg-bg-elevated/50',
               ].join(' ')}
               onMouseEnter={() => setHovered(s.ticker)}
               onMouseLeave={() => setHovered(null)}
             >
               {/* Color swatch */}
-              <div
-                className="w-2 h-2 rounded-sm shrink-0"
-                style={{ background: s.color }}
-              />
+              <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: s.color }} />
 
               {/* Ticker */}
               <span className="text-xs font-mono font-semibold text-text w-12 shrink-0">{s.ticker}</span>
@@ -209,12 +227,9 @@ export default function AllocationChart({ lots, prices }) {
                 {s.pct.toFixed(1)}%
               </span>
 
-              {/* Value — hidden in censor mode */}
-              <span className={[
-                'text-xs tabular-nums text-text-muted text-right shrink-0 w-20',
-                censored ? 'invisible' : '',
-              ].join(' ')}>
-                {fmt(s.value)}
+              {/* Value */}
+              <span className="text-xs tabular-nums text-text-muted text-right shrink-0 w-20">
+                {censored ? '••••••' : fmt(s.value)}
               </span>
             </div>
           ))}
