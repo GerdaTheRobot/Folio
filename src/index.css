@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+/* ============================================================
+   THEME TOKENS
+   Edit the values below to restyle the entire application.
+   Light and dark mode each have their own set of values.
+   ============================================================ */
+
+:root {
+  /* --- Light mode --- */
+  --bg:              #f4f6ff;
+  --bg-secondary:    #eaecf8;
+  --bg-card:         #ffffff;
+  --bg-elevated:     #eef0fb;
+  --border:          #d5d8ee;
+  --border-subtle:   #e5e8f5;
+
+  --text:            #111827;
+  --text-secondary:  #4b5068;
+  --text-muted:      #9096b0;
+
+  --accent:          #5753e4;
+  --accent-hover:    #4440cc;
+  --accent-fg:       #ffffff;
+  --accent-subtle:   rgba(87, 83, 228, 0.10);
+
+  --positive:        #15803d;
+  --positive-bg:     #dcfce7;
+  --negative:        #b91c1c;
+  --negative-bg:     #fee2e2;
+
+  --shadow-sm:       0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:       0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.05);
+  --shadow-lg:       0 10px 40px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+}
+
+[data-theme="dark"] {
+  /* --- Dark mode --- */
+  --bg:              #0c0e18;
+  --bg-secondary:    #11141f;
+  --bg-card:         #181b2a;
+  --bg-elevated:     #1f2336;
+  --border:          #272b3f;
+  --border-subtle:   #1c1f30;
+
+  --text:            #e6e8f2;
+  --text-secondary:  #8b91ab;
+  --text-muted:      #4e5470;
+
+  --accent:          #6c68f0;
+  --accent-hover:    #837ff5;
+  --accent-fg:       #ffffff;
+  --accent-subtle:   rgba(108, 104, 240, 0.14);
+
+  --positive:        #34d399;
+  --positive-bg:     rgba(52, 211, 153, 0.12);
+  --negative:        #f87171;
+  --negative-bg:     rgba(248, 113, 113, 0.12);
+
+  --shadow-sm:       0 1px 3px rgba(0,0,0,0.30), 0 1px 2px rgba(0,0,0,0.20);
+  --shadow-md:       0 4px 16px rgba(0,0,0,0.40), 0 2px 6px rgba(0,0,0,0.25);
+  --shadow-lg:       0 10px 40px rgba(0,0,0,0.50), 0 4px 12px rgba(0,0,0,0.30);
+}
+
+/* ============================================================
+   TAILWIND v4 — map CSS vars to utility tokens
+   ============================================================ */
+@theme inline {
+  --color-bg:             var(--bg);
+  --color-bg-secondary:   var(--bg-secondary);
+  --color-bg-card:        var(--bg-card);
+  --color-bg-elevated:    var(--bg-elevated);
+  --color-border:         var(--border);
+  --color-border-subtle:  var(--border-subtle);
+
+  --color-text:           var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted:     var(--text-muted);
+
+  --color-accent:         var(--accent);
+  --color-accent-hover:   var(--accent-hover);
+  --color-accent-fg:      var(--accent-fg);
+  --color-accent-subtle:  var(--accent-subtle);
+
+  --color-positive:       var(--positive);
+  --color-positive-bg:    var(--positive-bg);
+  --color-negative:       var(--negative);
+  --color-negative-bg:    var(--negative-bg);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ============================================================
+   SMOOTH THEME TRANSITION
+   Only fires during the brief window when theme is switching.
+   ============================================================ */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition:
+    background-color 0.25s ease,
+    border-color     0.25s ease,
+    color            0.15s ease,
+    box-shadow       0.25s ease !important;
+}
+
+/* ============================================================
+   GLOBAL BASE
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbar — dark mode friendly */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Remove native spinners from number inputs */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type='number'] { -moz-appearance: textfield; }
