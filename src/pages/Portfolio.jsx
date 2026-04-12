@@ -90,7 +90,7 @@ export default function Portfolio() {
 
   const displayName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
   const heldTickers = Object.keys(stats.holdings)
-  const recentLots  = lots.slice(0, 5)
+  const recentLots  = lots.slice(0, 9)
 
   const hasValue   = stats.totalValue !== null
   const totalPL    = stats.totalPL
@@ -239,7 +239,7 @@ export default function Portfolio() {
 
           {/* Recent activity */}
           <div
-            className="lg:col-span-2 rounded-2xl border border-border p-5 flex flex-col gap-1"
+            className="lg:col-span-2 rounded-2xl border border-border p-5 flex flex-col gap-1 min-h-0 overflow-hidden"
             style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)' }}
           >
             <div className="flex items-center justify-between mb-2">
@@ -267,7 +267,9 @@ export default function Portfolio() {
                 </button>
               </div>
             ) : (
-              recentLots.map(lot => <RecentLotRow key={lot.id} lot={lot} />)
+              <div className="flex flex-col flex-1 overflow-y-auto -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+                {recentLots.map(lot => <RecentLotRow key={lot.id} lot={lot} />)}
+              </div>
             )}
           </div>
         </div>
