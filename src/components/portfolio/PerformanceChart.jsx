@@ -127,8 +127,13 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     if (ticker) return histData ?? []
     const days = { '1W': 7, '1M': 30, '3M': 90, '1Y': 365, 'All': null }[range]
     if (!days) return costBasisPoints
-    const cutoff = Date.now() / 1000 - days * 86400
-    return costBasisPoints.filter(p => p.time >= cutoff)
+    const cutoff = Math.floor(Date.now() / 1000 - days * 86400)
+    const after  = costBasisPoints.filter(p => p.time >= cutoff)
+    // Carry the last known value before the cutoff as the range-start anchor point
+    // so the chart always has a starting value even when there's no lot activity in the period
+    const lastBefore = [...costBasisPoints].reverse().find(p => p.time < cutoff)
+    if (lastBefore) return [{ time: cutoff, value: lastBefore.value }, ...after]
+    return after
   }, [ticker, histData, costBasisPoints, range])
 
   const isEmpty = visiblePoints.length < 2
