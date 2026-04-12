@@ -25,13 +25,15 @@ const INTRADAY_PARAMS = {
 // ── Yahoo Finance (unofficial, no key required) ───────────────────────────────
 
 export async function fetchHistoryYahoo(ticker, rangeLabel = '1Y', intradayInterval = '5m') {
-  const params = rangeLabel === '1D'
+  const p = rangeLabel === '1D'
     ? (INTRADAY_PARAMS[intradayInterval] ?? INTRADAY_PARAMS['5m'])
     : (DAILY_PARAMS[rangeLabel] ?? DAILY_PARAMS['1Y'])
 
-  const url =
-    `/yahoo-finance/v8/finance/chart/${encodeURIComponent(ticker)}` +
-    `?interval=${params.interval}&range=${params.range}`
+  // In dev, Vite proxies /yahoo-finance → Yahoo directly.
+  // In production (Vercel), /api/yahoo is the serverless function.
+  const url = import.meta.env.PROD
+    ? `/api/yahoo?ticker=${encodeURIComponent(ticker)}&interval=${p.interval}&range=${p.range}`
+    : `/yahoo-finance/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${p.interval}&range=${p.range}`
 
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Yahoo Finance: ${res.status} for ${ticker}`)
@@ -47,9 +49,7 @@ export async function fetchHistoryYahoo(ticker, rangeLabel = '1Y', intradayInter
   for (let i = 0; i < timestamps.length; i++) {
     const t = timestamps[i]
     const v = closes[i]
-    if (t != null && v != null) {
-      points.push({ time: t, value: v })
-    }
+    if (t != null && v != null) points.push({ time: t, value: v })
   }
   return points
 }

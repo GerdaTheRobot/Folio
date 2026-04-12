@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/yahoo-finance/:path*", "destination": "/api/yahoo-finance/:path*" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
