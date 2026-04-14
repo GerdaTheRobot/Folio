@@ -98,6 +98,23 @@ export async function fetchHistoryTwelve(ticker, rangeLabel = '1Y', intradayInte
     .reverse()
 }
 
+// ── In-memory cache ───────────────────────────────────────────────────────────
+// Keyed by "source:ticker:range:intraday". TTL: 5 min for daily, 60s for 1D.
+const _cache = new Map()
+const TTL = { '1D': 60_000, default: 5 * 60_000 }
+
+function cacheGet(key, is1D) {
+  const entry = _cache.get(key)
+  if (!entry) return null
+  const ttl = is1D ? TTL['1D'] : TTL.default
+  if (Date.now() - entry.ts > ttl) { _cache.delete(key); return null }
+  return entry.data
+}
+
+function cacheSet(key, data) {
+  _cache.set(key, { data, ts: Date.now() })
+}
+
 // ── Unified fetch ─────────────────────────────────────────────────────────────
 
 /**
@@ -108,8 +125,17 @@ export async function fetchHistoryTwelve(ticker, rangeLabel = '1Y', intradayInte
  * @param {string}           [apiKey]           required for 'twelve'
  */
 export async function fetchHistory(source, ticker, rangeLabel, intradayInterval = '5m', apiKey) {
-  if (source === 'twelve') return fetchHistoryTwelve(ticker, rangeLabel, intradayInterval, apiKey)
-  return fetchHistoryYahoo(ticker, rangeLabel, intradayInterval)
+  const is1D = rangeLabel === '1D'
+  const key  = `${source}:${ticker}:${rangeLabel}:${is1D ? intradayInterval : ''}`
+  const hit  = cacheGet(key, is1D)
+  if (hit) return hit
+
+  const data = source === 'twelve'
+    ? await fetchHistoryTwelve(ticker, rangeLabel, intradayInterval, apiKey)
+    : await fetchHistoryYahoo(ticker, rangeLabel, intradayInterval)
+
+  cacheSet(key, data)
+  return data
 }
 
 /** Polling interval in ms for a given range/intraday combo */

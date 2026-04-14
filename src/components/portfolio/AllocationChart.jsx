@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useCensor } from '../../context/CensorContext'
 import { useCurrency } from '../../context/CurrencyContext'
 
@@ -191,22 +192,24 @@ export default function AllocationChart({ lots, prices }) {
         </div>
 
         {/* ── Legend ── */}
-        <div className="flex flex-col gap-1 flex-1 w-full min-w-0">
+        <div className="flex flex-col flex-1 w-full min-w-0" onMouseLeave={() => setHovered(null)}>
           {slices.map(s => (
             <div
               key={s.ticker}
               className={[
-                'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-100 cursor-default',
+                'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors duration-100',
                 hovered === s.ticker ? 'bg-bg-elevated' : 'hover:bg-bg-elevated/50',
               ].join(' ')}
               onMouseEnter={() => setHovered(s.ticker)}
-              onMouseLeave={() => setHovered(null)}
             >
               {/* Color swatch */}
               <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: s.color }} />
 
               {/* Ticker */}
-              <span className="text-xs font-mono font-semibold text-text w-12 shrink-0">{s.ticker}</span>
+              <Link
+                to={`/stock/${s.ticker}`}
+                className="text-xs font-mono font-semibold text-text w-12 shrink-0 hover:text-accent transition-colors duration-150"
+              >{s.ticker}</Link>
 
               {/* Bar */}
               <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>

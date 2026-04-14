@@ -193,7 +193,8 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
 
   useEffect(() => {
     let cancelled = false
-    setFetching(true); setFetchErr(null); setHistData(null)
+    setFetching(true); setFetchErr(null)
+    // Don't clear histData — keep previous chart visible while new range loads
 
     const promise = ticker
       ? fetchHistory(source, ticker, range, intraday, twelveKey)
@@ -348,8 +349,13 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     const onRangeChange = () => setRangeVersion(v => v + 1)
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange)
 
+    let lastWidth = 0
     const ro = new ResizeObserver(() => {
-      if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth })
+      if (!containerRef.current) return
+      const w = containerRef.current.clientWidth
+      if (w === lastWidth) return   // no actual size change — skip to avoid render loops
+      lastWidth = w
+      chart.applyOptions({ width: w })
     })
     ro.observe(containerRef.current)
     return () => {
@@ -386,6 +392,16 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
     } else {
       seriesRef.current.setData([])
     }
+  }, [visiblePoints])
+
+  // Period delta — start → end of the loaded range (static per range, never updates on hover)
+  const periodDelta = useMemo(() => {
+    if (visiblePoints.length < 2) return null
+    const first = visiblePoints[0].value
+    const last  = visiblePoints[visiblePoints.length - 1].value
+    const diff  = last - first
+    const pct   = (diff / first) * 100
+    return { diff, pct, pos: diff >= 0 }
   }, [visiblePoints])
 
   // Hover delta — null when locked (locked delta shown instead)
@@ -454,19 +470,21 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
             {ticker ? `${ticker} Price` : 'Portfolio Value'}
           </h2>
 
+          {/* Period / hover delta badge */}
+          {!compareMode && periodDelta && (
+            <span className={[
+              'text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded shrink-0',
+              periodDelta.pos ? 'bg-positive-bg text-positive' : 'bg-negative-bg text-negative',
+            ].join(' ')}>
+              {periodDelta.pos ? '+' : ''}{fmtVal(periodDelta.diff)} ({periodDelta.pos ? '+' : ''}{periodDelta.pct.toFixed(2)}%)
+            </span>
+          )}
+
           {/* Market closed badge */}
           {!marketStatus.isOpen && (
             <span className="flex items-center gap-1 text-xs text-text-muted bg-bg-elevated border border-border px-2 py-0.5 rounded-full shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-negative inline-block" />
               {marketStatus.isWeekend ? 'Market closed' : 'After hours'}
-            </span>
-          )}
-
-          {/* Normal tooltip */}
-          {!compareMode && tooltip && (
-            <span className="text-sm tabular-nums">
-              <span className="font-semibold text-text">{fmtVal(tooltip.value)}</span>
-              <span className="text-text-muted ml-2 text-xs">{tooltip.date}</span>
             </span>
           )}
 
@@ -531,33 +549,35 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
             </button>
           )}
 
-          {/* Intraday interval picker */}
-          {ticker && is1D && (
-            <div className="flex gap-0.5 bg-bg-elevated rounded-md p-0.5">
-              {INTRADAY.map(iv => (
-                <button key={iv} onClick={() => setIntraday(iv)}
-                  className={[
-                    'px-2 py-0.5 rounded text-xs font-medium transition-colors duration-150',
-                    intraday === iv ? 'bg-accent-subtle text-accent' : 'text-text-muted hover:text-text',
-                  ].join(' ')}>
-                  {iv}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Source toggle */}
-          {ticker && !is1D && (
-            <div className="flex gap-0.5 bg-bg-elevated rounded-md p-0.5">
-              {SOURCES.map((s, i) => (
-                <button key={s} onClick={() => setSourceIdx(i)}
-                  className={[
-                    'px-2 py-0.5 rounded text-xs font-medium transition-colors duration-150',
-                    sourceIdx === i ? 'bg-accent-subtle text-accent' : 'text-text-muted hover:text-text',
-                  ].join(' ')}>
-                  {s}
-                </button>
-              ))}
+          {/* Intraday / source toggle — fixed-width slot so range buttons never shift */}
+          {ticker && (
+            <div className="relative flex bg-bg-elevated rounded-md p-0.5" style={{ width: 148 }}>
+              {/* Source toggle — always rendered to set container width */}
+              <div className={`flex w-full gap-0.5 ${is1D ? 'invisible pointer-events-none' : ''}`}>
+                {SOURCES.map((s, i) => (
+                  <button key={s} onClick={() => setSourceIdx(i)}
+                    className={[
+                      'flex-1 py-0.5 rounded text-xs font-medium whitespace-nowrap transition-colors duration-150',
+                      sourceIdx === i ? 'bg-accent-subtle text-accent' : 'text-text-muted hover:text-text',
+                    ].join(' ')}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {/* Intraday picker — overlays source toggle when 1D is active */}
+              {is1D && (
+                <div className="absolute inset-0 flex gap-0.5 bg-bg-elevated rounded-md p-0.5">
+                  {INTRADAY.map(iv => (
+                    <button key={iv} onClick={() => setIntraday(iv)}
+                      className={[
+                        'flex-1 py-0.5 rounded text-xs font-medium transition-colors duration-150',
+                        intraday === iv ? 'bg-accent-subtle text-accent' : 'text-text-muted hover:text-text',
+                      ].join(' ')}>
+                      {iv}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -576,12 +596,20 @@ export default function PerformanceChart({ lots, prices = {}, ticker = null }) {
         </div>
       </div>
 
-      {/* Polling badge */}
-      {ticker && is1D && pollSecs && (
-        <p className="text-xs text-text-muted -mt-1">
-          15-min delayed · refreshing every {pollSecs}s
-        </p>
-      )}
+      {/* Tooltip row — fixed height so chart never moves when crosshair enters/leaves */}
+      <div className="h-5 flex items-center -mt-1">
+        {!compareMode && tooltip && (
+          <span className="text-sm tabular-nums leading-none">
+            <span className="font-semibold text-text">{fmtVal(tooltip.value)}</span>
+            <span className="text-text-muted ml-2 text-xs">{tooltip.date}</span>
+          </span>
+        )}
+        {ticker && is1D && pollSecs && !tooltip && (
+          <p className="text-xs text-text-muted">
+            15-min delayed · refreshing every {pollSecs}s
+          </p>
+        )}
+      </div>
 
       {/* Chart */}
       <div className={[

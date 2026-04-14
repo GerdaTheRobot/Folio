@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, DollarSign, Layers, Plus } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/layout/Navbar'
@@ -8,6 +8,7 @@ import PerformanceChart from '../components/portfolio/PerformanceChart'
 import AllocationChart from '../components/portfolio/AllocationChart'
 import { useLots } from '../hooks/useLots'
 import { fmtDate, lotTotal } from '../lib/lots'
+import { fetchHistory } from '../lib/priceHistory'
 import { useCurrency } from '../context/CurrencyContext'
 import { useAuth } from '../context/AuthContext'
 import { useCensor } from '../context/CensorContext'
@@ -95,6 +96,14 @@ export default function Portfolio() {
   const displayName = user?.user_metadata?.full_name?.split(' ')[0] || 'there'
   const heldTickers = Object.keys(stats.holdings)
   const recentLots  = lots.slice(0, 9)
+
+  // Warm the price-history cache for all held tickers as soon as lots arrive,
+  // so the portfolio chart renders instantly when the user scrolls to it.
+  useEffect(() => {
+    if (!lots.length) return
+    const tickers = [...new Set(lots.map(l => l.ticker))]
+    tickers.forEach(t => fetchHistory('yahoo', t, '1Y').catch(() => {}))
+  }, [lots])
 
   const hasValue   = stats.totalValue !== null
   const totalPL    = stats.totalPL
